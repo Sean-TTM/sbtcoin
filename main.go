@@ -1,12 +1,7 @@
 package main
 
-import (
-	"github.com/sean-ttm/sbtcoin/explorer"
-	"github.com/sean-ttm/sbtcoin/rest"
-)
-
+import "github.com/sean-ttm/sbtcoin/cli"
 
 func main() {
-	go explorer.Start(3000)
-	rest.Start(4000)
+	cli.Start()
 }
