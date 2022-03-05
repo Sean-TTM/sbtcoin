@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime"
 
 	"github.com/sean-ttm/sbtcoin/explorer"
 	"github.com/sean-ttm/sbtcoin/rest"
@@ -16,7 +17,7 @@ func usage(){
 	fmt.Printf("-port=4000: 	Set the PORT of the server\n")
 	fmt.Printf("-mode=rest: 	Choose among 'html', 'rest', or 'both'\n")
 	fmt.Printf("-port2=5000:	Set the PORT of the html (if both)")
-	os.Exit(0)
+	runtime.Goexit()
 }
 
 func Start(){

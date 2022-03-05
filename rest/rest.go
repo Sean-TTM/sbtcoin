@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 
 	"github.com/gorilla/mux"
 	"github.com/sean-ttm/sbtcoin/blockchain"
@@ -62,7 +61,7 @@ func documentation(rw http.ResponseWriter, r *http.Request){
 			Payload: 		"data:string",
 		},
 		{
-			URL: 			url("/blocks/{id}"),
+			URL: 			url("/blocks/{hash}"),
 			Method: 		"GET",
 			Description: 	"See a Block",
 		},
@@ -83,16 +82,15 @@ func blocks(rw http.ResponseWriter, r *http.Request){
 	case "GET":
 		//web에 contents가 json이라고 알려줌 (Middleware로 구현함)
 		//rw.Header().Add("Content-Type", "application/json")
-		
 		//Allblocks를 Json으로 encode 함
-		json.NewEncoder(rw).Encode(blockchain.GetBlockchain().AllBlocks())
+		json.NewEncoder(rw).Encode(blockchain.Blockchain().Blocks())
 	case "POST":
 		var addBlockBody addBlockBody
 		//r.body에서 POST로 Json data를 decode함, 여기선 Message를 가져와서 addBlockBody에 넣음
 		//이 pointer로 써야 하고, err handler 있어야 함
 		utils.HandleErr(json.NewDecoder(r.Body).Decode(&addBlockBody))
 		//Blockchain package에 있는 block data 넣는 함수 호출
-		blockchain.GetBlockchain().AddBlock(addBlockBody.Message)
+		blockchain.Blockchain().AddBlock(addBlockBody.Message)
 		//POST일 때에는 statusCreated (==201) 넣음
 		rw.WriteHeader(http.StatusCreated)
 	}	
@@ -106,9 +104,8 @@ func block(rw http.ResponseWriter, r *http.Request){
 	//height := vars["height"]
 
 	//strconv: string 변환 library, Atoi는 string to ineger	
-	id, err := strconv.Atoi(vars["height"])
-	utils.HandleErr(err)
-	block, err := blockchain.GetBlockchain().GetBlock(id)
+	hash := vars["hash"]
+	block, err := blockchain.FindBlock(hash)
 	encoder := json.NewEncoder(rw)
 	if err == blockchain.ErrNotFound {
 		encoder.Encode(errorResponse{fmt.Sprint(err)})
@@ -142,7 +139,7 @@ func Start (aPort int) {
 	router.HandleFunc("/blocks", blocks).Methods("GET","POST")
 	
 	//gorillaMux - id:number 인 주소 처리 
-	router.HandleFunc("/blocks/{height:[0-9]}", block).Methods("GET")
+	router.HandleFunc("/blocks/{hash:[a-f0-9]+}", block).Methods("GET")
 	
 	fmt.Printf("Listening on http://localhost%s\n", port)
 	log.Fatal(http.ListenAndServe(port, router))
