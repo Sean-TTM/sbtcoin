@@ -13,7 +13,15 @@ type blockchain struct {
 	//blocks []*Block
 	NewestHash 	string	 `jason:"newestHash"`
 	Height 		int		 `jason:"height"`
+	CurrentDifficulty int `json:"currentDifficulty"`
 }
+
+const (
+	defaultDifficulty   int = 2
+	difficultyInterval  int = 5
+	blockInterval		int = 2
+	allowedRange		int = 2
+)
 
 //singleton Pattern https://refactoring.guru/design-patterns/singleton/go/example#example-0
 var b *blockchain
@@ -32,6 +40,7 @@ func (b *blockchain) AddBlock(data string) {
 	block := creatBlock(data, b.NewestHash, b.Height +1 )
 	b.NewestHash = block.Hash
 	b.Height = block.Height
+	b.CurrentDifficulty = block.Difficulty
 	b.persist()
 }
 
@@ -50,12 +59,40 @@ func (b *blockchain) Blocks() []*Block {
 	return blocks
 }
 
+//adjust difficulty of mining by mining 걸린 시간 조사
+func (b *blockchain) recalculateDifficulty() int {
+	allBlocks := b.Blocks()
+	newestBlock := allBlocks[0]
+	lastRecalculatedBlock := allBlocks[difficultyInterval - 1]
+	actualTime := (newestBlock.Timestamp - lastRecalculatedBlock.Timestamp)/60 
+	expectedTime := difficultyInterval * blockInterval
+	if actualTime <= (expectedTime - allowedRange) {
+		return b.CurrentDifficulty + 1
+	} else if actualTime >= (expectedTime + allowedRange) {
+		return b.CurrentDifficulty - -1
+	}
+	return b.CurrentDifficulty
+}
+
+func (b *blockchain) difficulty() int {
+	if b.Height == 0 {
+		return defaultDifficulty
+	} else if b.Height % difficultyInterval == 0 {
+		//recalculate the difficulty
+		return b.recalculateDifficulty()
+	} else {
+		return b.CurrentDifficulty
+	}
+}
+
 func Blockchain()*blockchain {
 	if b == nil {
 		//do it only once
 		once.Do(func() {
 			//initialize blockchain
-			b = &blockchain{"", 0}
+			b = &blockchain{
+				Height : 0,
+			}
 			checkpoint := db.Checkpoint()
 			if checkpoint == nil {
 				b.AddBlock("Genesis")

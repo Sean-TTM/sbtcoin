@@ -55,6 +55,11 @@ func documentation(rw http.ResponseWriter, r *http.Request){
 			Description:	"See Documentation",
 		},
 		{
+			URL: 			url("/status"),
+			Method: 		"GET",
+			Description:	"See the Status of the Blockchain",
+		},
+		{
 			URL: 			url("/blocks"),
 			Method: 		"POST",
 			Description: 	"Add a Block",
@@ -122,7 +127,11 @@ func jsonContentMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func Start (aPort int) {
+func status(rw http.ResponseWriter, r *http.Request){
+	json.NewEncoder(rw).Encode(blockchain.Blockchain())
+}
+
+func Start(aPort int) {
 	//HandleFunc이 동시에 다루어지기 때문에, 별도의 Mux (Multiplexer)를 생성해서, default Mux 대신 쓰이게 함 
 	//handler := http.NewServeMux()
 	
@@ -136,6 +145,7 @@ func Start (aPort int) {
 	router.Use(jsonContentMiddleware)
 
 	router.HandleFunc("/", documentation).Methods("GET")
+	router.HandleFunc("/status", status).Methods("GET")
 	router.HandleFunc("/blocks", blocks).Methods("GET","POST")
 	
 	//gorillaMux - id:number 인 주소 처리 
