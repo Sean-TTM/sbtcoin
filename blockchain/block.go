@@ -2,7 +2,6 @@ package blockchain
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -11,7 +10,7 @@ import (
 )
 
 type Block struct {
-	Data 	 	string  `json:"data"`
+	//Data 	 	string  `json:"data"`
 	Hash	 	string  `json:"hash"`
 	PrevHash 	string  `json:"prevHash,omitempty"`
 	Height	 	int 	`json:"height"`
@@ -21,6 +20,7 @@ type Block struct {
 	Nonce		int		`json:"nonce"`
 	//to find out how long it takes for creating block
 	Timestamp 	int		`json:"timestamp"`
+	Transactions []*Tx	`json:"transactions"`
 }
 
 //db에 block 저장
@@ -35,16 +35,6 @@ func (b *Block) restore(data []byte){
 	utils.FromBytes(b, data)
 }
 
-func FindBlock(hash string) (*Block, error){
-	blockBytes := db.Block(hash)
-	if blockBytes == nil {
-		return nil, ErrNotFound
-	}
-	block := &Block{}
-	block.restore(blockBytes)
-	return block, nil
-}
-
 func (b *Block) mine(){
 	//0이 difficulty 만큼 연속으로 있는 Hash 찾기 위함
 	target := strings.Repeat("0", b.Difficulty)
@@ -56,7 +46,7 @@ func (b *Block) mine(){
 		//fmt.Printf("Block as String:%s\nHash:%s\nNonce:%d\n\n\n", blockAsString, hash, b.Nonce )
 		
 		hash := utils.Hash(b)
-		fmt.Printf("Target:%s\nHash:%s\nNonce:%d\n\n\n", target, hash, b.Nonce)
+		//fmt.Printf("Target:%s\nHash:%s\nNonce:%d\n\n\n", target, hash, b.Nonce)
 		//string.Hasprefix -> hash가 target="00"으로 시작하는지 return하는 함수
 		if strings.HasPrefix(hash, target){
 			//timestamp로 difficulty level check 하기 위함
@@ -69,18 +59,30 @@ func (b *Block) mine(){
 	}
 }
 
-func creatBlock(data string, prevHash string, height int) *Block{
+func FindBlock(hash string) (*Block, error){
+	blockBytes := db.Block(hash)
+	if blockBytes == nil {
+		return nil, ErrNotFound
+	}
+	block := &Block{}
+	block.restore(blockBytes)
+	return block, nil
+}
+
+
+func creatBlock(prevHash string, height int, diff int) *Block{
 	block := &Block{
-		Data: data,
+		//Data: data,
 		Hash: "",
 		PrevHash: prevHash,
 		Height: height,
 		//const difficulty predefined
-		Difficulty: Blockchain().difficulty(),
+		Difficulty: diff,
 		Nonce: 0,
 	}
 	//mining function - proof of work
 	block.mine()
+	block.Transactions = Mempool.txToConfirm()
 	//save block data to DB
 	block.persist()
 	return block

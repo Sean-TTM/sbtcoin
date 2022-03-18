@@ -14,9 +14,9 @@ import (
 var port string
 
 //PORT 에서 message로 호출하는 것 받아오기 위함
-type addBlockBody struct {
-	Message string
-}
+//type addBlockBody struct {
+//	Message string
+//}
 
 type url string
 
@@ -37,8 +37,18 @@ type URLDescription struct {
 	//`json:"-"` : ignore json
 }
 
+type balanceResponse struct {
+	Address 	string `json:"address"`
+	Balance		int		`json:"balance"`
+}
+
 type errorResponse struct {
 	ErrorMessage string `json:"errorMessage"`
+}
+
+type addTxPayload struct {
+	To 		string
+	Amount 	int 
 }
 
 //String()는 내장되어 있어서, 별도 implement 없이 바로 사용 가능
@@ -61,6 +71,11 @@ func documentation(rw http.ResponseWriter, r *http.Request){
 		},
 		{
 			URL: 			url("/blocks"),
+			Method: 		"Get",
+			Description: 	"See All Blokcs",
+		},
+		{
+			URL: 			url("/blocks"),
 			Method: 		"POST",
 			Description: 	"Add a Block",
 			Payload: 		"data:string",
@@ -69,6 +84,11 @@ func documentation(rw http.ResponseWriter, r *http.Request){
 			URL: 			url("/blocks/{hash}"),
 			Method: 		"GET",
 			Description: 	"See a Block",
+		},
+		{
+			URL:			url("/balance/{address}"),
+			Method:			"GET",
+			Description: 	"Get TxOuts for an Address",
 		},
 	}
 	//sending json response (middleware로 구현함)
@@ -88,14 +108,14 @@ func blocks(rw http.ResponseWriter, r *http.Request){
 		//web에 contents가 json이라고 알려줌 (Middleware로 구현함)
 		//rw.Header().Add("Content-Type", "application/json")
 		//Allblocks를 Json으로 encode 함
-		json.NewEncoder(rw).Encode(blockchain.Blockchain().Blocks())
+		json.NewEncoder(rw).Encode(blockchain.Blocks(blockchain.Blockchain()))
 	case "POST":
-		var addBlockBody addBlockBody
+		//var addBlockBody addBlockBody
 		//r.body에서 POST로 Json data를 decode함, 여기선 Message를 가져와서 addBlockBody에 넣음
 		//이 pointer로 써야 하고, err handler 있어야 함
-		utils.HandleErr(json.NewDecoder(r.Body).Decode(&addBlockBody))
+		//utils.HandleErr(json.NewDecoder(r.Body).Decode(&addBlockBody))
 		//Blockchain package에 있는 block data 넣는 함수 호출
-		blockchain.Blockchain().AddBlock(addBlockBody.Message)
+		blockchain.Blockchain().AddBlock()
 		//POST일 때에는 statusCreated (==201) 넣음
 		rw.WriteHeader(http.StatusCreated)
 	}	
@@ -131,6 +151,35 @@ func status(rw http.ResponseWriter, r *http.Request){
 	json.NewEncoder(rw).Encode(blockchain.Blockchain())
 }
 
+func balance(rw http.ResponseWriter, r *http.Request){
+	vars := mux.Vars(r)
+	address := vars["address"]
+	//URL library에 있는 query function
+	total := r.URL.Query().Get("total")
+	switch total {
+	case "true":
+		amount := blockchain.BalanceByAddress(address, blockchain.Blockchain())
+		utils.HandleErr(json.NewEncoder(rw).Encode(balanceResponse{address, amount}))
+		//fmt.Println(amount)
+	default:
+		utils.HandleErr(json.NewEncoder(rw).Encode(blockchain.UTxOutsByAddress(address, blockchain.Blockchain())))
+	}
+}
+
+func mempool(rw http.ResponseWriter, r *http.Request){
+	utils.HandleErr(json.NewEncoder(rw).Encode(blockchain.Mempool.Txs))
+}
+
+func transactions(rw http.ResponseWriter, r *http.Request) {
+	var payload addTxPayload
+	utils.HandleErr(json.NewDecoder(r.Body).Decode(&payload))
+	err := blockchain.Mempool.AddTx(payload.To, payload.Amount)
+	if err != nil {
+		json.NewEncoder(rw).Encode(errorResponse{"not enough funds"})
+	}
+	rw.WriteHeader(http.StatusCreated)
+}
+
 func Start(aPort int) {
 	//HandleFunc이 동시에 다루어지기 때문에, 별도의 Mux (Multiplexer)를 생성해서, default Mux 대신 쓰이게 함 
 	//handler := http.NewServeMux()
@@ -150,7 +199,12 @@ func Start(aPort int) {
 	
 	//gorillaMux - id:number 인 주소 처리 
 	router.HandleFunc("/blocks/{hash:[a-f0-9]+}", block).Methods("GET")
-	
+	//? -> true일 때 다르게 반응
+	router.HandleFunc("/balance/{address}", balance)
+	//for unconfirmed transactions
+	router.HandleFunc("/mempool", mempool)
+	router.HandleFunc("/transactions", transactions).Methods("POST")
+
 	fmt.Printf("Listening on http://localhost%s\n", port)
 	log.Fatal(http.ListenAndServe(port, router))
 }
